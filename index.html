@@ -315,6 +315,27 @@
       background: #111;
     }
 
+    .tour-shell[data-theme="editorial"] {
+      --accent: #caa14d;
+      --cta-bg: #1f574d;
+      --cta-button: #ad5338;
+      --panel-bg: rgba(250, 248, 242, 0.98);
+    }
+
+    .tour-shell[data-theme="midnight"] {
+      --accent: #78b7ad;
+      --cta-bg: #172125;
+      --cta-button: #2f7f74;
+      --panel-bg: rgba(238, 241, 240, 0.98);
+    }
+
+    .tour-shell[data-theme="gallery"] {
+      --accent: #c07a49;
+      --cta-bg: #2f3d37;
+      --cta-button: #9a563a;
+      --panel-bg: rgba(250, 247, 240, 0.98);
+    }
+
     .tour-stage {
       position: relative;
       min-height: 100vh;
@@ -400,6 +421,18 @@
         linear-gradient(0deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0) 44%);
     }
 
+    .tour-shell[data-theme="midnight"] .shade {
+      background:
+        linear-gradient(90deg, rgba(5, 14, 16, 0.7), rgba(5, 14, 16, 0.08) 48%, rgba(5, 14, 16, 0.34)),
+        linear-gradient(0deg, rgba(5, 14, 16, 0.72), rgba(5, 14, 16, 0) 44%);
+    }
+
+    .tour-shell[data-theme="gallery"] .shade {
+      background:
+        linear-gradient(90deg, rgba(26, 21, 16, 0.46), rgba(26, 21, 16, 0.04) 46%, rgba(26, 21, 16, 0.24)),
+        linear-gradient(0deg, rgba(26, 21, 16, 0.58), rgba(26, 21, 16, 0) 46%);
+    }
+
     .tour-top {
       position: absolute;
       left: 24px;
@@ -474,7 +507,7 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: var(--gold);
+      background: var(--accent, var(--gold));
     }
 
     .tour-copy h2 {
@@ -507,6 +540,7 @@
       padding: 22px;
       color: var(--ink);
       background: rgba(250, 248, 242, 0.98);
+      background: var(--panel-bg, rgba(250, 248, 242, 0.98));
     }
 
     .tour-panel h2 {
@@ -533,7 +567,7 @@
       display: block;
       width: var(--progress, 0%);
       height: 100%;
-      background: var(--gold);
+      background: var(--accent, var(--gold));
       transition: width 260ms ease;
     }
 
@@ -605,7 +639,7 @@
       margin-top: 18px;
       padding: 16px;
       border-radius: var(--radius);
-      background: var(--green);
+      background: var(--cta-bg, var(--green));
       color: #fff;
       box-shadow: var(--shadow);
     }
@@ -779,6 +813,14 @@
               <option value="zoom">Soft zoom</option>
             </select>
           </label>
+          <label>
+            Tour style
+            <select id="tourTheme">
+              <option value="editorial">Warm editorial</option>
+              <option value="midnight">Midnight premium</option>
+              <option value="gallery">Gallery clean</option>
+            </select>
+          </label>
         </div>
         <label style="margin-top:10px;">
           CTA description
@@ -797,11 +839,10 @@
         </div>
         <div class="actions">
           <button class="button subtle" id="loadSample" type="button">Load sample condo</button>
-          <button class="button green" id="analyzePhotos" type="button">AI analyze photos</button>
-          <button class="button subtle" id="polishCaptions" type="button">Polish captions</button>
+          <button class="button green" id="polishCaptions" type="button">MOAB polish captions</button>
           <button class="button danger" id="clearPhotos" type="button">Clear photos</button>
         </div>
-        <div class="status" id="aiStatus">AI analysis requires the local server. Use the local app link I give you after this update.</div>
+        <div class="status" id="moabStatus">MOAB uses room labels and editable templates, with no AI cost or external photo analysis.</div>
         <p class="note">Tip: put exterior, living room, kitchen, bedroom, bathroom, balcony, laundry, and storage in the order you want before uploading when possible.</p>
       </section>
 
@@ -970,6 +1011,7 @@
       email: document.getElementById("email"),
       phone: document.getElementById("phone"),
       transitionStyle: document.getElementById("transitionStyle"),
+      tourTheme: document.getElementById("tourTheme"),
       ctaText: document.getElementById("ctaText")
     };
 
@@ -977,12 +1019,7 @@
     const fileInput = document.getElementById("fileInput");
     const dropzone = document.getElementById("dropzone");
     const previewMount = document.getElementById("previewMount");
-    const aiStatus = document.getElementById("aiStatus");
-
-    function apiBaseUrl() {
-      if (location.protocol === "file:") return "http://127.0.0.1:4299";
-      return location.origin;
-    }
+    const moabStatus = document.getElementById("moabStatus");
 
     function escapeHtml(value) {
       return String(value || "")
@@ -1044,86 +1081,6 @@
       };
     }
 
-    function setAiStatus(message) {
-      aiStatus.innerHTML = message;
-    }
-
-    function loadImage(dataUrl) {
-      return new Promise((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = reject;
-        image.src = dataUrl;
-      });
-    }
-
-    async function compressImage(dataUrl, maxSize = 1280, quality = 0.82) {
-      if (!String(dataUrl).startsWith("data:image/")) return dataUrl;
-      const image = await loadImage(dataUrl);
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.max(1, Math.round(image.width * scale));
-      const height = Math.max(1, Math.round(image.height * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0, width, height);
-      return canvas.toDataURL("image/jpeg", quality);
-    }
-
-    async function analyzeOneRoom(room, index, total) {
-      setAiStatus(`<strong>Analyzing photo ${index + 1} of ${total}</strong> — ${escapeHtml(room.fileName || room.room)}...`);
-      const image = await compressImage(room.image);
-      const response = await fetch(`${apiBaseUrl()}/api/analyze-photo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image,
-          fileName: room.fileName,
-          currentRoom: room.room,
-          property: getSettings()
-        })
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || "AI analysis failed.");
-      }
-
-      return payload;
-    }
-
-    async function analyzePhotosWithAi() {
-      if (!state.rooms.length) {
-        setAiStatus("Upload photos or load the sample condo first.");
-        return;
-      }
-
-      const button = document.getElementById("analyzePhotos");
-      button.disabled = true;
-
-      try {
-        for (let index = 0; index < state.rooms.length; index += 1) {
-          const analysis = await analyzeOneRoom(state.rooms[index], index, state.rooms.length);
-          Object.assign(state.rooms[index], {
-            room: analysis.room || state.rooms[index].room,
-            title: analysis.title || state.rooms[index].title,
-            caption: analysis.caption || state.rooms[index].caption,
-            tags: Array.isArray(analysis.tags) ? analysis.tags.join(", ") : state.rooms[index].tags
-          });
-          state.activeIndex = index;
-          saveState();
-          render();
-        }
-
-        setAiStatus("<strong>Done.</strong> The captions now come from actual image analysis. Review/edit anything before exporting.");
-      } catch (error) {
-        setAiStatus(`<strong>AI analysis stopped:</strong> ${escapeHtml(error.message)} Make sure the local server is running with an OpenAI API key.`);
-      } finally {
-        button.disabled = false;
-      }
-    }
-
     function readFileAsDataUrl(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1170,6 +1127,7 @@
       });
       saveState();
       render();
+      moabStatus.innerHTML = "<strong>MOAB polish applied.</strong> Review any room-specific details, then export the tour.";
     }
 
     function getSettings() {
@@ -1181,6 +1139,7 @@
         email: fields.email.value.trim() || "leasing@example.com",
         phone: fields.phone.value.trim() || "",
         transitionStyle: fields.transitionStyle.value || "sweep",
+        tourTheme: fields.tourTheme.value || "editorial",
         ctaText: fields.ctaText.value.trim() || "Schedule a showing or request rental details."
       };
     }
@@ -1327,7 +1286,7 @@
 
       const current = rooms[activeIndex] || rooms[0];
       return `
-        <div class="tour-shell" data-active-index="${activeIndex}" data-transition="${escapeHtml(settings.transitionStyle || "sweep")}">
+        <div class="tour-shell" data-active-index="${activeIndex}" data-transition="${escapeHtml(settings.transitionStyle || "sweep")}" data-theme="${escapeHtml(settings.tourTheme || "editorial")}">
           <section class="tour-stage">
             <img id="tourPhoto" class="is-moving transition-${escapeHtml(settings.transitionStyle || "sweep")}" src="${current.image}" alt="${escapeHtml(current.room)}" style="--pan-x:${current.panX};--pan-y:${current.panY};">
             <div class="shade"></div>
@@ -1587,7 +1546,6 @@
     dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
     document.getElementById("loadSample").addEventListener("click", loadSample);
-    document.getElementById("analyzePhotos").addEventListener("click", analyzePhotosWithAi);
     document.getElementById("polishCaptions").addEventListener("click", polishCaptions);
     document.getElementById("clearPhotos").addEventListener("click", () => {
       state.rooms = [];
