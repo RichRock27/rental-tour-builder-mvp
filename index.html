@@ -328,11 +328,68 @@
       height: 100%;
       object-fit: cover;
       transform: scale(1.07);
-      transition: opacity 260ms ease, transform 650ms ease;
+      clip-path: inset(0 0 0 0);
+      transition: opacity 360ms ease, transform 900ms ease, clip-path 720ms ease;
     }
 
     .tour-stage img.is-moving {
       transform: scale(1.11) translate3d(var(--pan-x, 0), var(--pan-y, 0), 0);
+    }
+
+    .tour-stage img.transition-fade {
+      animation: fadePhoto 720ms ease both;
+    }
+
+    .tour-stage img.transition-sweep {
+      animation: sweepPhoto 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .tour-stage img.transition-slide {
+      animation: slidePhoto 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .tour-stage img.transition-zoom {
+      animation: zoomPhoto 860ms ease both;
+    }
+
+    @keyframes fadePhoto {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes sweepPhoto {
+      from {
+        opacity: 0.72;
+        clip-path: inset(0 100% 0 0);
+        transform: scale(1.09) translate3d(-1.8%, 0, 0);
+      }
+      to {
+        opacity: 1;
+        clip-path: inset(0 0 0 0);
+        transform: scale(1.11) translate3d(var(--pan-x, 0), var(--pan-y, 0), 0);
+      }
+    }
+
+    @keyframes slidePhoto {
+      from {
+        opacity: 0;
+        transform: scale(1.09) translate3d(3.5%, 0, 0);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1.11) translate3d(var(--pan-x, 0), var(--pan-y, 0), 0);
+      }
+    }
+
+    @keyframes zoomPhoto {
+      from {
+        opacity: 0.35;
+        transform: scale(1.02);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1.11) translate3d(var(--pan-x, 0), var(--pan-y, 0), 0);
+      }
     }
 
     .shade {
@@ -701,6 +758,15 @@
             CTA phone
             <input id="phone" value="+13035550100">
           </label>
+          <label>
+            Photo transition
+            <select id="transitionStyle">
+              <option value="sweep">Professional sweep</option>
+              <option value="fade">Soft fade</option>
+              <option value="slide">Smooth slide</option>
+              <option value="zoom">Soft zoom</option>
+            </select>
+          </label>
         </div>
         <label style="margin-top:10px;">
           CTA description
@@ -719,6 +785,7 @@
         </div>
         <div class="actions">
           <button class="button subtle" id="loadSample" type="button">Load sample condo</button>
+          <button class="button subtle" id="polishCaptions" type="button">Polish captions</button>
           <button class="button danger" id="clearPhotos" type="button">Clear photos</button>
         </div>
         <p class="note">Tip: put exterior, living room, kitchen, bedroom, bathroom, balcony, laundry, and storage in the order you want before uploading when possible.</p>
@@ -775,55 +842,106 @@
     const roomDefaults = {
       "Exterior": {
         title: "Start outside",
-        caption: "Begin with the building approach and setting before stepping inside.",
-        tags: "Building view, Entry approach, Exterior context"
+        caption: "Start with the exterior so renters understand the building style, walkway, upper-level setting, and how the home is approached before moving inside.",
+        tags: "Building view, Entry approach, Upper-level setting"
       },
       "Living Room": {
         title: "Open living area",
-        caption: "A bright living area gives the tour its main interior moment and helps renters picture the layout.",
-        tags: "Hardwood floors, Natural light, Flexible layout"
+        caption: "The living room creates the main first impression with open floor space, warm flooring, and a comfortable layout that is easy to furnish.",
+        tags: "Open living area, Warm flooring, Flexible layout"
       },
       "Kitchen": {
         title: "Updated kitchen",
-        caption: "The kitchen highlights everyday function with cabinetry, appliances, counter space, and easy flow.",
-        tags: "Stainless appliances, Cabinet storage, Practical layout"
+        caption: "The kitchen is presented as a practical daily-use space with visible cabinetry, appliances, counter space, and a straightforward cooking layout.",
+        tags: "Appliance package, Cabinet storage, Counter space"
       },
       "Balcony": {
         title: "Covered balcony",
-        caption: "Outdoor space adds a lifestyle moment for coffee, plants, or fresh air.",
-        tags: "Covered outdoor space, Tree view, Fresh air"
+        caption: "The balcony adds a useful outdoor moment for fresh air, plants, or a small seating area, giving the rental more lifestyle appeal.",
+        tags: "Covered outdoor space, Outdoor seating, Fresh air"
       },
       "Bedroom": {
         title: "Bright bedroom",
-        caption: "The bedroom offers a simple, flexible layout with room for the essentials.",
-        tags: "Bedroom, Natural light, Easy to furnish"
+        caption: "The bedroom is shown as a clean, flexible private space with room for the essentials and a simple layout for furniture placement.",
+        tags: "Private bedroom, Flexible layout, Natural light"
       },
       "Walk-in Closet": {
         title: "Roomy storage",
-        caption: "Dedicated closet space makes the rental feel more functional and move-in ready.",
-        tags: "Walk-in closet, Shelf storage, Hanging space"
+        caption: "The walk-in closet gives the home a practical storage advantage, with dedicated hanging areas and room for bins, shoes, and seasonal items.",
+        tags: "Walk-in closet, Hanging space, Shelf storage"
       },
       "Laundry": {
         title: "In-unit laundry",
-        caption: "In-unit laundry adds the everyday convenience renters notice quickly.",
+        caption: "The in-unit laundry area is a strong convenience feature, giving renters washer and dryer access without leaving the home.",
         tags: "Washer included, Dryer included, Laundry closet"
       },
       "Bathroom": {
         title: "Updated bath",
-        caption: "The bathroom stop shows the vanity, shower area, and clean finish details.",
-        tags: "Updated vanity, Shower area, Large mirror"
+        caption: "The bathroom stop highlights the vanity, mirror, flooring, and shower or tub area so renters can quickly understand the finish level.",
+        tags: "Bathroom vanity, Shower area, Mirror"
       },
       "Storage": {
         title: "Extra storage",
-        caption: "Additional shelving and storage make daily living easier.",
-        tags: "Shelving, Extra storage, Organized space"
+        caption: "Extra storage helps the home feel more livable by giving renters a place for household items, supplies, and overflow belongings.",
+        tags: "Shelving, Extra storage, Household organization"
       },
       "Amenities": {
         title: "Community amenities",
-        caption: "Show the community features that help complete the rental story.",
+        caption: "Community photos round out the rental story by showing the shared spaces and setting renters will experience beyond the unit.",
         tags: "Community setting, Shared amenities, Lifestyle"
       }
     };
+
+    const sampleRoomCopy = [
+      {
+        room: "Exterior",
+        title: "Second-floor condo setting",
+        caption: "Start outside with a clear view of the condo building, central walkway, stone chimney details, and the upper-level balcony location for this rental.",
+        tags: "Second-floor setting, Building approach, Balcony location"
+      },
+      {
+        room: "Living Room",
+        title: "Living room with fireplace",
+        caption: "The living room opens with rich hardwood-style floors, a stone fireplace focal point, and sliding glass doors that bring in natural light from the covered balcony.",
+        tags: "Stone fireplace, Hardwood-style floors, Balcony access"
+      },
+      {
+        room: "Kitchen",
+        title: "Bright stainless kitchen",
+        caption: "The kitchen features white cabinetry, stainless appliances, a patterned backsplash, and a compact galley-style layout that keeps the main appliances within easy reach.",
+        tags: "Stainless appliances, White cabinetry, Patterned backsplash"
+      },
+      {
+        room: "Balcony",
+        title: "Covered balcony with tree view",
+        caption: "The covered balcony gives renters a private outdoor spot with railing, overhead coverage, and a neighborhood tree view just off the living area.",
+        tags: "Covered balcony, Tree view, Private outdoor space"
+      },
+      {
+        room: "Bedroom",
+        title: "Clean bedroom layout",
+        caption: "The bedroom continues the dark hardwood-style flooring and offers a simple rectangular layout with window light and neutral walls for easy furniture placement.",
+        tags: "Hardwood-style floors, Window light, Neutral walls"
+      },
+      {
+        room: "Walk-in Closet",
+        title: "Walk-in closet storage",
+        caption: "The walk-in closet provides a deeper storage area with hanging rods and shelving on both sides, making it useful for clothes, bins, and seasonal storage.",
+        tags: "Walk-in closet, Dual hanging rods, Shelf storage"
+      },
+      {
+        room: "Laundry",
+        title: "Washer and dryer included",
+        caption: "The laundry closet includes a full washer and dryer with overhead shelving, giving renters an everyday convenience that adds real value to the unit.",
+        tags: "Washer included, Dryer included, Overhead shelf"
+      },
+      {
+        room: "Bathroom",
+        title: "Updated bathroom finishes",
+        caption: "The bathroom shows a marble-look tile tub surround, white vanity, large mirror, and brown tile flooring for a cleaner, more updated presentation.",
+        tags: "Marble-look tile, White vanity, Large mirror"
+      }
+    ];
 
     const state = {
       activeIndex: 0,
@@ -837,6 +955,7 @@
       subtitle: document.getElementById("subtitle"),
       email: document.getElementById("email"),
       phone: document.getElementById("phone"),
+      transitionStyle: document.getElementById("transitionStyle"),
       ctaText: document.getElementById("ctaText")
     };
 
@@ -862,8 +981,30 @@
     function roomPreset(roomName) {
       return roomDefaults[roomName] || {
         title: roomName,
-        caption: "A helpful stop in the guided rental walkthrough.",
-        tags: "Rental feature, Photo stop, Guided tour"
+        caption: `${roomName} is included as a guided stop so renters can understand the space before scheduling an in-person showing.`,
+        tags: "Rental feature, Guided stop, Photo tour"
+      };
+    }
+
+    function polishedCopyForRoom(roomName) {
+      const preset = roomPreset(roomName);
+      const copyMap = {
+        "Exterior": "This exterior stop sets the scene with the building approach, entry path, and overall property setting before the tour moves inside.",
+        "Living Room": "This living room stop should be the main interior moment, helping renters understand the open space, flooring, light, and where daily seating or entertaining would happen.",
+        "Kitchen": "This kitchen stop focuses on the functional details renters compare first: appliance placement, cabinet storage, counter area, and the connection to the rest of the home.",
+        "Balcony": "This balcony stop adds lifestyle value by showing the outdoor space renters could use for fresh air, plants, or a small seating setup.",
+        "Bedroom": "This bedroom stop presents the private sleeping area with emphasis on layout, light, flooring, and how easily the room can be furnished.",
+        "Walk-in Closet": "This closet stop calls attention to practical storage, including hanging space, shelving, and room for everyday or seasonal items.",
+        "Laundry": "This laundry stop highlights one of the strongest convenience features: washer and dryer access inside the home.",
+        "Bathroom": "This bathroom stop helps renters quickly evaluate the vanity, mirror, flooring, shower or tub area, and overall finish level.",
+        "Storage": "This storage stop makes the rental feel more functional by showing where supplies, bins, and overflow belongings can go.",
+        "Amenities": "This amenities stop rounds out the rental story by showing shared spaces and community features beyond the unit itself."
+      };
+
+      return {
+        title: preset.title,
+        caption: copyMap[roomName] || preset.caption,
+        tags: preset.tags
       };
     }
 
@@ -908,9 +1049,25 @@
     async function loadSample() {
       state.rooms = [];
       for (let index = 0; index < sampleImages.length; index += 1) {
-        state.rooms.push(makeRoom(sampleImages[index], index, sampleImages[index].split("/").pop()));
+        const room = makeRoom(sampleImages[index], index, sampleImages[index].split("/").pop());
+        Object.assign(room, sampleRoomCopy[index] || {});
+        state.rooms.push(room);
       }
       state.activeIndex = 0;
+      saveState();
+      render();
+    }
+
+    function polishCaptions() {
+      state.rooms = state.rooms.map((room) => {
+        const polished = polishedCopyForRoom(room.room);
+        return {
+          ...room,
+          title: polished.title,
+          caption: polished.caption,
+          tags: polished.tags
+        };
+      });
       saveState();
       render();
     }
@@ -923,6 +1080,7 @@
         subtitle: fields.subtitle.value.trim() || "Guided rental walkthrough",
         email: fields.email.value.trim() || "leasing@example.com",
         phone: fields.phone.value.trim() || "",
+        transitionStyle: fields.transitionStyle.value || "sweep",
         ctaText: fields.ctaText.value.trim() || "Schedule a showing or request rental details."
       };
     }
@@ -1069,9 +1227,9 @@
 
       const current = rooms[activeIndex] || rooms[0];
       return `
-        <div class="tour-shell" data-active-index="${activeIndex}">
+        <div class="tour-shell" data-active-index="${activeIndex}" data-transition="${escapeHtml(settings.transitionStyle || "sweep")}">
           <section class="tour-stage">
-            <img id="tourPhoto" class="is-moving" src="${current.image}" alt="${escapeHtml(current.room)}" style="--pan-x:${current.panX};--pan-y:${current.panY};">
+            <img id="tourPhoto" class="is-moving transition-${escapeHtml(settings.transitionStyle || "sweep")}" src="${current.image}" alt="${escapeHtml(current.room)}" style="--pan-x:${current.panX};--pan-y:${current.panY};">
             <div class="shade"></div>
             <header class="tour-top">
               <div class="brand">
@@ -1154,15 +1312,19 @@
         active = (index + rooms.length) % rooms.length;
         const shell = root.querySelector(".tour-shell");
         if (shell) shell.dataset.activeIndex = String(active);
+        const transition = shell?.dataset.transition || "sweep";
         const current = rooms[active];
         if (photo) {
+          photo.classList.remove("transition-fade", "transition-sweep", "transition-slide", "transition-zoom", "is-moving");
           photo.style.opacity = "0";
           window.setTimeout(() => {
             photo.src = current.image;
             photo.alt = current.room;
             photo.style.setProperty("--pan-x", current.panX);
             photo.style.setProperty("--pan-y", current.panY);
+            void photo.offsetWidth;
             photo.style.opacity = "1";
+            photo.classList.add("is-moving", `transition-${transition}`);
           }, 100);
         }
         if (room) room.textContent = current.room;
@@ -1325,6 +1487,7 @@
     dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
     document.getElementById("loadSample").addEventListener("click", loadSample);
+    document.getElementById("polishCaptions").addEventListener("click", polishCaptions);
     document.getElementById("clearPhotos").addEventListener("click", () => {
       state.rooms = [];
       state.activeIndex = 0;
