@@ -650,6 +650,18 @@
       line-height: 1.4;
     }
 
+    .status {
+      margin-top: 10px;
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .status strong {
+      color: var(--green-dark);
+    }
+
     @media (max-width: 1080px) {
       .app {
         display: block;
@@ -785,9 +797,11 @@
         </div>
         <div class="actions">
           <button class="button subtle" id="loadSample" type="button">Load sample condo</button>
+          <button class="button green" id="analyzePhotos" type="button">AI analyze photos</button>
           <button class="button subtle" id="polishCaptions" type="button">Polish captions</button>
           <button class="button danger" id="clearPhotos" type="button">Clear photos</button>
         </div>
+        <div class="status" id="aiStatus">AI analysis requires the local server. Use the local app link I give you after this update.</div>
         <p class="note">Tip: put exterior, living room, kitchen, bedroom, bathroom, balcony, laundry, and storage in the order you want before uploading when possible.</p>
       </section>
 
@@ -963,6 +977,12 @@
     const fileInput = document.getElementById("fileInput");
     const dropzone = document.getElementById("dropzone");
     const previewMount = document.getElementById("previewMount");
+    const aiStatus = document.getElementById("aiStatus");
+
+    function apiBaseUrl() {
+      if (location.protocol === "file:") return "http://127.0.0.1:4299";
+      return location.origin;
+    }
 
     function escapeHtml(value) {
       return String(value || "")
@@ -1022,6 +1042,86 @@
         panX: index % 2 === 0 ? "-0.8%" : "0.8%",
         panY: index % 3 === 0 ? "0.4%" : "-0.4%"
       };
+    }
+
+    function setAiStatus(message) {
+      aiStatus.innerHTML = message;
+    }
+
+    function loadImage(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = dataUrl;
+      });
+    }
+
+    async function compressImage(dataUrl, maxSize = 1280, quality = 0.82) {
+      if (!String(dataUrl).startsWith("data:image/")) return dataUrl;
+      const image = await loadImage(dataUrl);
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0, width, height);
+      return canvas.toDataURL("image/jpeg", quality);
+    }
+
+    async function analyzeOneRoom(room, index, total) {
+      setAiStatus(`<strong>Analyzing photo ${index + 1} of ${total}</strong> — ${escapeHtml(room.fileName || room.room)}...`);
+      const image = await compressImage(room.image);
+      const response = await fetch(`${apiBaseUrl()}/api/analyze-photo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image,
+          fileName: room.fileName,
+          currentRoom: room.room,
+          property: getSettings()
+        })
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "AI analysis failed.");
+      }
+
+      return payload;
+    }
+
+    async function analyzePhotosWithAi() {
+      if (!state.rooms.length) {
+        setAiStatus("Upload photos or load the sample condo first.");
+        return;
+      }
+
+      const button = document.getElementById("analyzePhotos");
+      button.disabled = true;
+
+      try {
+        for (let index = 0; index < state.rooms.length; index += 1) {
+          const analysis = await analyzeOneRoom(state.rooms[index], index, state.rooms.length);
+          Object.assign(state.rooms[index], {
+            room: analysis.room || state.rooms[index].room,
+            title: analysis.title || state.rooms[index].title,
+            caption: analysis.caption || state.rooms[index].caption,
+            tags: Array.isArray(analysis.tags) ? analysis.tags.join(", ") : state.rooms[index].tags
+          });
+          state.activeIndex = index;
+          saveState();
+          render();
+        }
+
+        setAiStatus("<strong>Done.</strong> The captions now come from actual image analysis. Review/edit anything before exporting.");
+      } catch (error) {
+        setAiStatus(`<strong>AI analysis stopped:</strong> ${escapeHtml(error.message)} Make sure the local server is running with an OpenAI API key.`);
+      } finally {
+        button.disabled = false;
+      }
     }
 
     function readFileAsDataUrl(file) {
@@ -1487,6 +1587,7 @@
     dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
     document.getElementById("loadSample").addEventListener("click", loadSample);
+    document.getElementById("analyzePhotos").addEventListener("click", analyzePhotosWithAi);
     document.getElementById("polishCaptions").addEventListener("click", polishCaptions);
     document.getElementById("clearPhotos").addEventListener("click", () => {
       state.rooms = [];
